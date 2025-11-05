@@ -33,21 +33,26 @@ public class SandLab
   public static final int BLACKHOLE = 11;
   public static final int BOUNCY_BALL = 12;
   public static final int FAN = 13;
+  public static final int WILD = 14;
   
-  private static final int particleCount = 14;
+  private static final int particleCount = 15;
   
   public static final int COOL = particleCount;
   public static final int SPARK = particleCount+1;
   public static final int HEATLENS= particleCount+2;
-  public static final int DRAG= particleCount+3;
+  public static final int DRAG = particleCount+3;
+  public static final int RANDOMIZE = particleCount+4;
+  public static final int SURPRISE= particleCount+5;
+  public static final int ROUND = particleCount+6;
+  public static final int INVERT= particleCount+7;
   
   
-  private static final int toolCount = 4;
+  private static final int toolCount = 8;
   
   
   public static boolean Heatview = false;
   
-  int[] tools = {COOL,SPARK,HEATLENS,DRAG};
+  int[] tools = {COOL,SPARK,HEATLENS,DRAG,RANDOMIZE,SURPRISE,ROUND,INVERT};
   int[] solidy = {METAL,SAND,WOOD,CHARCOAL,ICE,BLACKHOLE,BOUNCY_BALL,FAN};
   int[] sandy = {SAND,WOOD,CHARCOAL};
   int[] liquidy = {WATER,LAVA};
@@ -76,6 +81,7 @@ public class SandLab
   int numCols;
   int GY;
   int GX;
+  boolean roundTheGrid=false;
   
   public SandLab(int numRows, int numCols){
     this.numRows=numRows;
@@ -102,7 +108,7 @@ public class SandLab
     spawnTemps.add(30);
     
     names[STEAM] = "Steam";
-    colors.add(new Color(225,225,225));
+    colors.add(new Color(225,225,250));
     spawnTemps.add(50);
     
     names[FIRE] = "Fire";
@@ -129,7 +135,6 @@ public class SandLab
     colors.add(new Color(100,100,200));
     spawnTemps.add(-60);
     
-    
     names[BLACKHOLE] = "Black Hole";
     colors.add(new Color(100,0,100));
     spawnTemps.add(0);
@@ -139,22 +144,32 @@ public class SandLab
     spawnTemps.add(50);
     
     names[FAN] = "Fan";
-    colors.add(new Color(230,230,230));
+    colors.add(new Color(200,200,200));
     spawnTemps.add(50);
+    
+    names[WILD] = "Wild";
+    colors.add(new Color(100,100,200));
+    spawnTemps.add(0);
+    
+    
     
     //tools
     
     names[COOL] = "Cool";
-    colors.add(new Color(0,255,0));
     
     names[SPARK] = "Spark";
-    colors.add(new Color(255,0,0));
     
     names[HEATLENS] = "Heat Lens";
-    colors.add(new Color(255,0,0));
     
     names[DRAG] = "Drag";
-    colors.add(new Color(0,0,0));
+    
+    names[RANDOMIZE] = "Randomize Particles";
+    
+    names[SURPRISE] = "Surprise Me";
+    
+    names[ROUND] = "Round the grid";
+    
+    names[INVERT] = "Invert";
     
     
     display = new SandDisplay("Falling Sand", numRows, numCols, names);
@@ -194,7 +209,37 @@ public class SandLab
 //	  		System.out.println("TEMP: "+ grid[TEMP][row][col]);
 	  		break;
 	  	case DRAG:
-	  		pull(col, row, 10);
+	  		pull(col, row, 20);
+	  		break;
+	  	case RANDOMIZE:
+	  		for(int y = 0; y<numRows;y++) {
+	  			for(int x= 0; x<numCols;x++) {
+	  				grid[BASE][y][x] = (int) (Math.random()*particleCount);
+	  			}
+	  		}
+	  		break;
+	  	case SURPRISE:
+	  		grid[BASE][row][col] = (int) (Math.random()*particleCount);
+	  		break;
+	  	case ROUND:
+	  		roundTheGrid=!roundTheGrid;
+			try {
+				Thread.sleep(200);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+	  		break;
+	  	
+	  	case INVERT:
+	  		GY=-GY;
+	  		GX=-GX;
+	  		try {
+				Thread.sleep(200);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 	  		break;
 	  }
   }
@@ -205,7 +250,10 @@ public class SandLab
 	  float blue;
 	  for(int row=0;row<grid[BASE].length;row++) {
 		  for(int col=0;col<grid[BASE][row].length;col++) {
-			  display.setColor(row, col, colors.get(grid[BASE][row][col]));
+			  if(grid[BASE][row][col] == WILD)display.setColor(row,col,randcolor());
+			  else display.setColor(row, col, colors.get(grid[BASE][row][col]));
+			  
+			  if(roundTheGrid)roundGrid();
 			  
 			  if(Heatview) {
 				  if(grid[TEMP][row][col]>1500)red = (float)1;
@@ -280,14 +328,18 @@ public class SandLab
 	  		iceTempLogic(col,row);
 	  		break;
 	  	case BLACKHOLE:
-	  		friction(col, row);
 	  		pull(col,row,20);
+	  		blackholeSpread(col,row);
 	  		break;
 	  	case BOUNCY_BALL:
 	  		bounce(col,row);
 	  		break;
 	  	case FAN:
 	  		blow(col,row,10,5);
+	  		break;
+	  	case WILD:
+	  		wild(col,row);
+	  		break;
 	  	default:
 	  		friction(col, row);
 	  		break;
@@ -319,7 +371,6 @@ public class SandLab
 	  return false;
 	  
   }
-  
   
   private void gravity(int x, int y, int material) {
 	  if(grid[BASE][y][x] != material)return;
@@ -487,7 +538,6 @@ public class SandLab
 	return false;
   }
   
-  
   private void bounce(int x, int y) {
 	double elasticity = .8;
 	grid[VY][y][x] += GY;
@@ -555,12 +605,13 @@ public class SandLab
 	  
 	  for(int i = -distance; i < 0;i++) {
 		  if(y+i>=0&& power-i<-1)grid[VY][y][x+i]+=-(i+power);
-		  else if(y+i>=0)grid[VY][y][x+i]+=-2;
+		  else if(y+i>=0)grid[VY][y+i][x]+=-2;
 		  if(isSolid(x, y+i))break;
 	  }
 	  
 	  
   }
+  
   private void snow(int x, int y) {
 	  if(Math.random()<.5)return;
 	  if(grid[BASE][y][x] != SNOW)return;
@@ -603,6 +654,33 @@ public class SandLab
 		  }
 	  }
 	  
+  }
+  
+  private Color randcolor() {
+	  int r = (int) (Math.random()*256);
+	  int g = (int) (Math.random()*256);
+	  int b = (int) (Math.random()*256);
+	  
+	  return new Color(r,g,b);
+  }
+  
+  private void roundGrid() {
+	  for(int x=0;x<numCols;x++) {
+		  if(grid[BASE][1][x]==EMPTY)move(x,numRows-1,x,1);
+		  if(grid[BASE][numRows-2][x]==EMPTY)move(x,0,x,numRows-2);  
+	  }
+	  for(int y=0;y<numRows;y++) {
+		  if(grid[BASE][y][1]==EMPTY)move(numCols-1,y,1,y);
+		  if(grid[BASE][y][numCols-2]==EMPTY)move(0,y,numCols-2,y);  
+	  }
+  }
+  
+  private void wild(int x, int y) {
+	  int x_change = (int) (Math.random()*7)-3;
+	  int y_change = (int) (Math.random()*7)-3;
+	  if((x+x_change)<0 || (x+x_change)>=numCols)x_change=0;
+	  if((y+y_change)<0 || (y+y_change)>=numRows)y_change=0;
+	  move(x,y,x+x_change,y+y_change);
   }
   
   private void heatDissipate(int x, int y) {
@@ -689,6 +767,25 @@ public class SandLab
 	  }
   }
   
+  private void blackholeSpread(int x,int y) {
+	  int i=-1;
+	  if((x+i)<0)i=0;
+	  int j;
+	  while(i<=1 || (x+i)<numCols) {
+		  j=-1;
+		  if((y+j)<0)j=0;
+		  while(j<=1 || (y+j)<numRows) {
+			  if(!isMaterial(x+i, y+j, BLACKHOLE) && !isMaterial(x+i, y+j, EMPTY)) {
+				  if(x+i>=0 && x+i<numCols && y+j >=0 && y+j <numRows) {
+					  if(Math.random()<.00005)grid[BASE][y+j][x+i]=BLACKHOLE;
+					  else if(Math.random()<.0005) grid[BASE][y+j][x+i]=EMPTY;
+				  }
+			  }
+			  j++;
+		  }
+		  i++;
+	  }
+  }
   
   private void sandTempLogic(int x, int y) {
 	  //stuff
@@ -756,7 +853,7 @@ public class SandLab
 
   private void woodTempLogic(int x, int y) {
 	  int temp = grid[TEMP][y][x];
-	  if(temp>110) {
+	  if(temp>70) {
 		  int signy = (int)Math.signum(grid[VY][y][x]);
 		  int signx = (int)Math.signum(grid[VX][y][x]);
 		  
